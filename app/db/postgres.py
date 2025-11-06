@@ -104,15 +104,18 @@ def get_async_database_url() -> str:
     )
 
 
-def get_engine():
+def get_engine(force_new: bool = False):
     """
     Get or create async database engine.
+    
+    Args:
+        force_new: If True, create a new engine even if one exists
     
     Returns:
         AsyncEngine instance
     """
     global _engine
-    if _engine is None:
+    if _engine is None or force_new:
         database_url = get_async_database_url()
         _engine = create_async_engine(
             database_url,
@@ -121,21 +124,25 @@ def get_engine():
             max_overflow=20,
             pool_pre_ping=True,
             pool_recycle=3600,
+            poolclass=None if force_new else None,  # Use default pool
         )
         logger.info(f"Created async database engine: {settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}")
     return _engine
 
 
-def get_session_maker():
+def get_session_maker(force_new: bool = False):
     """
     Get or create async session maker.
+    
+    Args:
+        force_new: If True, create a new session maker even if one exists
     
     Returns:
         async_sessionmaker instance
     """
     global _async_session_maker
-    if _async_session_maker is None:
-        engine = get_engine()
+    if _async_session_maker is None or force_new:
+        engine = get_engine(force_new=force_new)
         _async_session_maker = async_sessionmaker(
             engine,
             class_=AsyncSession,
@@ -143,6 +150,21 @@ def get_session_maker():
         )
         logger.info("Created async session maker")
     return _async_session_maker
+
+
+async def reset_engine():
+    """
+    Reset the global engine and session maker.
+    Useful for testing to avoid event loop issues.
+    """
+    global _engine, _async_session_maker
+    
+    if _engine is not None:
+        await _engine.dispose()
+        _engine = None
+    
+    _async_session_maker = None
+    logger.info("Reset database engine and session maker")
 
 
 async def init_db() -> None:

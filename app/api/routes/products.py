@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from typing import List
 
 from app.schemas.product import Product, ProductCreate
-from app.db.postgres import PostgresClient
+from app.db import postgres
 
 router = APIRouter()
 

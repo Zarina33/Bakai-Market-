@@ -5,8 +5,8 @@ from fastapi import APIRouter, status
 from typing import Dict, Any
 
 from app.config import settings
-from app.db.postgres import PostgresClient
-from app.db.qdrant import QdrantClient
+from app.db import postgres
+from app.db.qdrant import QdrantManager
 
 router = APIRouter()
 
@@ -33,9 +33,9 @@ async def detailed_health_check() -> Dict[str, Any]:
     
     # Check PostgreSQL
     try:
-        pg_client = PostgresClient()
-        pg_client.connect()
-        pg_client.close()
+        engine = postgres.get_engine()
+        async with engine.begin() as conn:
+            await conn.execute("SELECT 1")
         health_status["components"]["postgres"] = "healthy"
     except Exception as e:
         health_status["components"]["postgres"] = f"unhealthy: {str(e)}"
@@ -43,8 +43,8 @@ async def detailed_health_check() -> Dict[str, Any]:
     
     # Check Qdrant
     try:
-        qdrant_client = QdrantClient()
-        qdrant_client.client.get_collections()
+        qdrant_manager = QdrantManager()
+        qdrant_manager.client.get_collections()
         health_status["components"]["qdrant"] = "healthy"
     except Exception as e:
         health_status["components"]["qdrant"] = f"unhealthy: {str(e)}"

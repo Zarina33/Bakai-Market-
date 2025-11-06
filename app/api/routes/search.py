@@ -8,8 +8,8 @@ import io
 
 from app.schemas.search import SearchRequest, SearchResponse, SearchResult
 from app.models.clip_model import CLIPModel
-from app.db.qdrant import QdrantClient
-from app.db.postgres import PostgresClient
+from app.db.qdrant import QdrantManager
+from app.db import postgres
 from app.config import settings
 
 router = APIRouter()
@@ -17,7 +17,6 @@ router = APIRouter()
 # Initialize clients (in production, use dependency injection)
 clip_model = None
 qdrant_client = None
-postgres_client = None
 
 
 def get_clip_model() -> CLIPModel:
@@ -28,20 +27,12 @@ def get_clip_model() -> CLIPModel:
     return clip_model
 
 
-def get_qdrant_client() -> QdrantClient:
+def get_qdrant_client() -> QdrantManager:
     """Get or initialize Qdrant client."""
     global qdrant_client
     if qdrant_client is None:
-        qdrant_client = QdrantClient()
+        qdrant_client = QdrantManager()
     return qdrant_client
-
-
-def get_postgres_client() -> PostgresClient:
-    """Get or initialize PostgreSQL client."""
-    global postgres_client
-    if postgres_client is None:
-        postgres_client = PostgresClient()
-    return postgres_client
 
 
 @router.post("/search/text", response_model=SearchResponse)

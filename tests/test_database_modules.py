@@ -4,6 +4,7 @@ Test database modules (PostgreSQL and Qdrant).
 import pytest
 import asyncio
 from datetime import datetime
+from decimal import Decimal
 
 from app.db import (
     init_db,
@@ -18,6 +19,15 @@ from app.db import (
     close_db,
     QdrantManager,
 )
+from app.db.postgres import reset_engine
+
+
+@pytest.fixture(autouse=True)
+async def reset_db_engine():
+    """Reset database engine before each test to avoid event loop issues."""
+    await reset_engine()
+    yield
+    await reset_engine()
 
 
 class TestPostgreSQL:
@@ -43,7 +53,7 @@ class TestPostgreSQL:
             assert product.id is not None
             assert product.external_id == product_data["external_id"]
             assert product.title == product_data["title"]
-            assert product.price == product_data["price"]
+            assert float(product.price) == product_data["price"]
     
     @pytest.mark.asyncio
     async def test_get_product_by_external_id(self):
@@ -99,7 +109,7 @@ class TestPostgreSQL:
             
             assert updated_product is not None
             assert updated_product.title == "Updated Title"
-            assert updated_product.price == updated_data["price"]
+            assert float(updated_product.price) == updated_data["price"]
     
     @pytest.mark.asyncio
     async def test_delete_product(self):
@@ -148,17 +158,20 @@ class TestQdrant:
     """Test Qdrant vector database operations."""
     
     @pytest.fixture
-    def qdrant_manager(self):
+    async def qdrant_manager(self):
         """Create QdrantManager instance for testing."""
-        return QdrantManager(collection_name="test_collection")
+        manager = QdrantManager(collection_name="test_collection")
+        # Clean up before each test
+        if await manager.collection_exists():
+            await manager.delete_collection()
+        yield manager
+        # Clean up after test
+        if await manager.collection_exists():
+            await manager.delete_collection()
     
     @pytest.mark.asyncio
     async def test_create_collection(self, qdrant_manager):
         """Test creating a collection."""
-        # Clean up if exists
-        if await qdrant_manager.collection_exists():
-            await qdrant_manager.delete_collection()
-        
         success = await qdrant_manager.create_collection(vector_size=512, distance="Cosine")
         
         assert success is True
@@ -167,7 +180,7 @@ class TestQdrant:
     @pytest.mark.asyncio
     async def test_upsert_and_search_vectors(self, qdrant_manager):
         """Test upserting and searching vectors."""
-        # Ensure collection exists
+        # Create collection with correct dimension
         await qdrant_manager.create_collection(vector_size=128, distance="Cosine")
         
         # Create test vectors
@@ -203,7 +216,7 @@ class TestQdrant:
     @pytest.mark.asyncio
     async def test_delete_vectors(self, qdrant_manager):
         """Test deleting vectors."""
-        # Ensure collection exists
+        # Create collection with correct dimension
         await qdrant_manager.create_collection(vector_size=128, distance="Cosine")
         
         # Add test vectors

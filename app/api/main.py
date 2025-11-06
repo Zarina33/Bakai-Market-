@@ -1,49 +1,28 @@
 """
 Main FastAPI application.
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.config import settings
-from app.api.routes import search, health, products
+from app.api.routes import search, health, products, metrics
 from app.models.clip_model import CLIPEmbedder
 from app.db.qdrant import QdrantManager
+from app.middleware.logging import LoggingMiddleware
+from app.utils.logger import setup_logging
+from app.utils.metrics import set_clip_model_status, set_api_health
 
 
-def create_app() -> FastAPI:
-    """Create and configure FastAPI application."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events.
     
-    app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
-        debug=settings.debug,
-        description="Visual Search API using CLIP embeddings",
-    )
-    
-    # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Configure appropriately for production
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    # Include routers (search router already has prefix)
-    app.include_router(health.router, prefix="/api/v1", tags=["health"])
-    app.include_router(search.router, tags=["search"])
-    app.include_router(products.router, prefix="/api/v1", tags=["products"])
-    
-    return app
-
-
-app = create_app()
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Инициализация при старте приложения."""
+    Replaces deprecated @app.on_event("startup") and @app.on_event("shutdown").
+    """
+    # Startup
     logger.info("=" * 60)
     logger.info("Starting Visual Search API...")
     logger.info("=" * 60)
@@ -53,6 +32,9 @@ async def startup_event():
         logger.info("Initializing CLIP embedder...")
         search.clip_embedder = CLIPEmbedder(device="auto")
         logger.success(f"✅ CLIP embedder initialized (device={search.clip_embedder.device})")
+        
+        # Обновить метрику загрузки модели
+        set_clip_model_status(loaded=True)
         
         # Инициализация Qdrant manager
         logger.info("Initializing Qdrant manager...")
@@ -69,23 +51,71 @@ async def startup_event():
         else:
             logger.warning("⚠️  Qdrant collection does not exist. Please run load_demo_products.py first.")
         
+        # Установить API как здоровый
+        set_api_health(healthy=True)
+        
         logger.info("=" * 60)
         logger.success("✅ Startup complete! API is ready.")
+        logger.info(f"📊 Metrics available at: http://{settings.host}:{settings.port}/api/v1/metrics")
         logger.info("=" * 60)
         
     except Exception as e:
         logger.error(f"❌ Startup failed: {e}")
+        set_api_health(healthy=False)
+        set_clip_model_status(loaded=False)
         raise
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Очистка при остановке приложения."""
+    
+    # Yield control to the application
+    yield
+    
+    # Shutdown
     logger.info("Shutting down Visual Search API...")
+    
+    # Обновить метрики
+    set_api_health(healthy=False)
+    set_clip_model_status(loaded=False)
     
     # Cleanup if needed
     if search.qdrant_manager:
         search.qdrant_manager.close()
     
     logger.info("✅ Shutdown complete")
+
+
+def create_app() -> FastAPI:
+    """Create and configure FastAPI application."""
+    
+    # Настроить логирование перед созданием приложения
+    setup_logging()
+    
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.app_version,
+        debug=settings.debug,
+        description="Visual Search API using CLIP embeddings",
+        lifespan=lifespan,
+    )
+    
+    # Add logging middleware (должен быть первым для логирования всех запросов)
+    app.add_middleware(LoggingMiddleware)
+    
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Configure appropriately for production
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Include routers
+    app.include_router(health.router, prefix="/api/v1", tags=["health"])
+    app.include_router(search.router, tags=["search"])
+    app.include_router(products.router, prefix="/api/v1", tags=["products"])
+    app.include_router(metrics.router, prefix="/api/v1", tags=["monitoring"])
+    
+    return app
+
+
+app = create_app()
 

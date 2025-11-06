@@ -1,7 +1,7 @@
 """
 Search schemas for visual search API.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_serializer
 from typing import List, Optional
 from decimal import Decimal
 
@@ -18,10 +18,9 @@ class SearchResult(BaseModel):
     image_url: Optional[str] = Field(None, description="Product image URL")
     similarity_score: float = Field(..., ge=0.0, le=1.0, description="Similarity score (0.0-1.0)")
     
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v)
-        }
+    @field_serializer('price')
+    def serialize_price(self, price: Optional[Decimal], _info):
+        return float(price) if price is not None else None
 
 
 class SearchResponse(BaseModel):

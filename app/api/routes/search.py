@@ -16,6 +16,7 @@ from app.models.clip_model import CLIPEmbedder
 from app.db.qdrant import QdrantManager
 from app.db.postgres import get_session, get_product_by_external_id
 from app.config import settings
+from app.utils.metrics import record_search, record_clip_inference, record_qdrant_search
 
 router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
@@ -74,15 +75,23 @@ async def search_by_text(
         
         # 1. Генерировать текстовый эмбеддинг через CLIP
         embedder = get_clip_embedder()
+        
+        clip_start = time.time()
         query_embedding = embedder.encode_text(request.query)
+        clip_duration = time.time() - clip_start
+        record_clip_inference(clip_duration)
         
         # 2. Искать похожие векторы в Qdrant
         qdrant = get_qdrant_manager()
+        
+        qdrant_start = time.time()
         vector_results = await qdrant.search_similar(
             query_vector=query_embedding.tolist(),
             top_k=request.limit,
             score_threshold=request.min_similarity
         )
+        qdrant_duration = time.time() - qdrant_start
+        record_qdrant_search(qdrant_duration)
         
         # 3. Получить метаданные из PostgreSQL
         results = []
@@ -110,6 +119,9 @@ async def search_by_text(
         
         query_time_ms = int((time.time() - start_time) * 1000)
         
+        # Record metrics
+        record_search("by-text", time.time() - start_time, success=True)
+        
         logger.info(f"Text search completed: {len(results)} results in {query_time_ms}ms")
         
         return SearchResponse(
@@ -121,6 +133,8 @@ async def search_by_text(
     except HTTPException:
         raise
     except Exception as e:
+        # Record failed search
+        record_search("by-text", time.time() - start_time, success=False)
         logger.error(f"Text search failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
@@ -177,7 +191,11 @@ async def search_by_image(
         
         # 2. Генерировать эмбеддинг через CLIP
         embedder = get_clip_embedder()
+        
+        clip_start = time.time()
         embedding = await embedder.generate_embedding(temp_file_path)
+        clip_duration = time.time() - clip_start
+        record_clip_inference(clip_duration)
         
         if embedding is None:
             raise HTTPException(
@@ -187,11 +205,15 @@ async def search_by_image(
         
         # 3. Искать похожие векторы в Qdrant
         qdrant = get_qdrant_manager()
+        
+        qdrant_start = time.time()
         vector_results = await qdrant.search_similar(
             query_vector=embedding.tolist(),
             top_k=limit,
             score_threshold=min_similarity
         )
+        qdrant_duration = time.time() - qdrant_start
+        record_qdrant_search(qdrant_duration)
         
         # 4. Получить метаданные из PostgreSQL
         results = []
@@ -219,6 +241,9 @@ async def search_by_image(
         
         query_time_ms = int((time.time() - start_time) * 1000)
         
+        # Record metrics
+        record_search("by-image", time.time() - start_time, success=True)
+        
         logger.info(f"Image search completed: {len(results)} results in {query_time_ms}ms")
         
         return SearchResponse(
@@ -230,6 +255,8 @@ async def search_by_image(
     except HTTPException:
         raise
     except Exception as e:
+        # Record failed search
+        record_search("by-image", time.time() - start_time, success=False)
         logger.error(f"Image search failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
     finally:
@@ -284,7 +311,11 @@ async def search_similar_products(
                 image_path = product.image_url.replace("file://", "")
                 
                 embedder = get_clip_embedder()
+                
+                clip_start = time.time()
                 embedding = await embedder.generate_embedding(image_path)
+                clip_duration = time.time() - clip_start
+                record_clip_inference(clip_duration)
                 
                 if embedding is None:
                     raise HTTPException(
@@ -293,11 +324,14 @@ async def search_similar_products(
                     )
                 
                 # 2. Искать похожие
+                qdrant_start = time.time()
                 vector_results = await qdrant.search_similar(
                     query_vector=embedding.tolist(),
                     top_k=limit + 1,
                     score_threshold=0.0
                 )
+                qdrant_duration = time.time() - qdrant_start
+                record_qdrant_search(qdrant_duration)
                 
                 # 3. Получить метаданные из PostgreSQL (исключая сам товар)
                 results = []
@@ -330,6 +364,9 @@ async def search_similar_products(
                 
                 query_time_ms = int((time.time() - start_time) * 1000)
                 
+                # Record metrics
+                record_search("similar", time.time() - start_time, success=True)
+                
                 logger.info(f"Similar products search completed: {len(results)} results in {query_time_ms}ms")
                 
                 return SearchResponse(
@@ -346,5 +383,7 @@ async def search_similar_products(
     except HTTPException:
         raise
     except Exception as e:
+        # Record failed search
+        record_search("similar", time.time() - start_time, success=False)
         logger.error(f"Similar products search failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")

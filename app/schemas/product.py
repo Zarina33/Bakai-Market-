@@ -1,7 +1,7 @@
 """
 Product schemas.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -26,10 +26,9 @@ class ProductCreate(ProductBase):
 
 class Product(ProductBase):
     """Schema for product with database fields."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int = Field(..., description="Database ID")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Update timestamp")
-    
-    class Config:
-        from_attributes = True
 

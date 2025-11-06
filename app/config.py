@@ -36,9 +36,17 @@ class Settings(BaseSettings):
     
     @property
     def database_url(self) -> str:
-        """Construct PostgreSQL connection URL."""
+        """Construct PostgreSQL connection URL (sync)."""
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+    
+    @property
+    def async_database_url(self) -> str:
+        """Construct async PostgreSQL connection URL (asyncpg)."""
+        return (
+            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
     

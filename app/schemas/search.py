@@ -1,32 +1,39 @@
 """
-Search schemas.
+Search schemas for visual search API.
 """
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-
-
-class SearchRequest(BaseModel):
-    """Search request schema."""
-    query: str = Field(..., description="Search query (text or image URL)")
-    limit: int = Field(default=20, le=100, description="Maximum number of results")
-    threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Similarity threshold")
-    filters: Optional[Dict[str, Any]] = Field(None, description="Optional metadata filters")
+from typing import List, Optional
+from decimal import Decimal
 
 
 class SearchResult(BaseModel):
-    """Single search result."""
-    product_id: str = Field(..., description="Product ID")
+    """Результат поиска одного товара."""
+    product_id: str = Field(..., description="Internal product ID")
+    external_id: str = Field(..., description="External product ID")
     title: str = Field(..., description="Product title")
     description: Optional[str] = Field(None, description="Product description")
+    category: Optional[str] = Field(None, description="Product category")
+    price: Optional[Decimal] = Field(None, description="Product price")
+    currency: Optional[str] = Field(None, description="Currency code")
     image_url: Optional[str] = Field(None, description="Product image URL")
-    score: float = Field(..., description="Similarity score")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+    similarity_score: float = Field(..., ge=0.0, le=1.0, description="Similarity score (0.0-1.0)")
+    
+    class Config:
+        json_encoders = {
+            Decimal: lambda v: float(v)
+        }
 
 
 class SearchResponse(BaseModel):
-    """Search response schema."""
-    query: str = Field(..., description="Original query")
-    query_type: str = Field(..., description="Query type (text/image)")
+    """Ответ API поиска."""
+    query_time_ms: int = Field(..., description="Query execution time in milliseconds")
+    results_count: int = Field(..., description="Number of results returned")
     results: List[SearchResult] = Field(default=[], description="Search results")
-    total: int = Field(..., description="Total number of results")
+
+
+class TextSearchRequest(BaseModel):
+    """Запрос текстового поиска."""
+    query: str = Field(..., min_length=1, max_length=500, description="Search query text")
+    limit: int = Field(default=10, ge=1, le=50, description="Maximum number of results")
+    min_similarity: float = Field(default=0.0, ge=0.0, le=1.0, description="Minimum similarity threshold")
 

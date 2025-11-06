@@ -9,6 +9,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Загрузка переменных из .env файла
+if [ -f .env ]; then
+    export $(cat .env | grep -v '^#' | grep -v '^$' | xargs)
+fi
+
+# Установка значений по умолчанию, если не заданы в .env
+POSTGRES_DB=${POSTGRES_DB:-visual_search}
+POSTGRES_USER=${POSTGRES_USER:-postgres}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+
 echo -e "${BLUE}============================================${NC}"
 echo -e "${BLUE}  Проверка системы визуального поиска${NC}"
 echo -e "${BLUE}============================================${NC}"
@@ -75,11 +85,11 @@ echo -e "${BLUE}--- Проверка базы данных ---${NC}"
 echo ""
 
 # 7. База данных существует
-check "База данных visual_search" "docker exec visual_search_postgres psql -U postgres -lqt | cut -d \| -f 1 | grep -qw visual_search"
+check "База данных $POSTGRES_DB" "docker exec visual_search_postgres psql -U $POSTGRES_USER -lqt | cut -d \| -f 1 | grep -qw $POSTGRES_DB"
 
 # 8. Таблицы созданы
-TABLES=$(docker exec visual_search_postgres psql -U postgres -d visual_search -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null | tr -d ' ')
-if [ "$TABLES" -ge "2" ]; then
+TABLES=$(docker exec visual_search_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null | tr -d ' ')
+if [ ! -z "$TABLES" ] && [ "$TABLES" -ge "2" ]; then
     echo -e "Проверка таблиц в БД... ${GREEN}✅ OK${NC} (найдено $TABLES таблиц)"
     ((PASSED++))
 else
@@ -89,7 +99,7 @@ else
 fi
 
 # 9. Есть данные в таблице products
-PRODUCTS=$(docker exec visual_search_postgres psql -U postgres -d visual_search -t -c "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d ' ')
+PRODUCTS=$(docker exec visual_search_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d ' ')
 if [ ! -z "$PRODUCTS" ] && [ "$PRODUCTS" -gt "0" ]; then
     echo -e "Проверка данных в products... ${GREEN}✅ OK${NC} (найдено $PRODUCTS продуктов)"
     ((PASSED++))

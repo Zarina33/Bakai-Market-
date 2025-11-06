@@ -82,38 +82,64 @@ docker-compose logs qdrant
 docker exec -it visual_search_postgres psql -U postgres -d visual_search
 ```
 
-### 3.2. Выполните тестовые команды
+## Шаг 3: Проверка PostgreSQL
 
+### 3.1. Подключитесь к PostgreSQL
+```bash
+docker exec -it visual_search_postgres psql -U bakaimarket -d market
+```
+
+### 3.2. Выполните тестовые команды
 ```sql
 -- Проверить версию PostgreSQL
 SELECT version();
 
--- Список таблиц (пока пусто, таблицы создадутся позже)
+-- Список таблиц
 \dt
+
+-- Ожидаемый вывод:
+--              List of relations
+--  Schema |    Name     | Type  |    Owner    
+-- --------+-------------+-------+-------------
+--  public | products    | table | bakaimarket
+--  public | search_logs | table | bakaimarket
+
+-- Просмотр данных в таблице products
+SELECT * FROM products;
+
+-- Количество продуктов
+SELECT COUNT(*) FROM products;
+
+-- Структура таблицы
+\d products
 
 -- Выход
 \q
 ```
 
 ### 3.3. Альтернативный способ проверки
-
 ```bash
 # Проверка подключения
-docker exec visual_search_postgres pg_isready -U postgres
+docker exec visual_search_postgres pg_isready -U bakaimarket
 
 # Ожидаемый вывод:
 # /var/run/postgresql:5432 - accepting connections
+
+# Быстрая проверка таблиц
+docker exec -it visual_search_postgres psql -U bakaimarket -d market -c "\dt"
+
+# Быстрая проверка данных
+docker exec -it visual_search_postgres psql -U bakaimarket -d market -c "SELECT COUNT(*) FROM products;"
 ```
 
 ### 3.4. Подключение с хоста
-
 ```bash
 # Установите psql, если еще не установлен
-# sudo apt install postgresql-client
+sudo apt install postgresql-client
 
 # Подключитесь
-psql -h localhost -p 5432 -U postgres -d visual_search
-# Пароль: postgres (из .env файла)
+psql -h localhost -p 5432 -U bakaimarket -d market
+# Пароль: market (из .env файла)
 ```
 
 ---

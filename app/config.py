@@ -145,6 +145,20 @@ class Settings(BaseSettings):
     max_retries: int = Field(default=3, description="Maximum number of retries")
     retry_delay: int = Field(default=1, description="Initial retry delay in seconds")
     retry_backoff: int = Field(default=2, description="Retry backoff multiplier")
+    
+    # BakaiMarket CDN Settings
+    bakai_cdn_api_url: str = Field(
+        default="https://api-cdn.bakai.store",
+        description="BakaiMarket CDN API URL"
+    )
+    bakai_cdn_access_key: str = Field(default="", description="BakaiMarket CDN access key")
+    bakai_cdn_secret_key: str = Field(default="", description="BakaiMarket CDN secret key")
+    
+    # Webhook Settings
+    webhook_secret: str = Field(
+        default="",
+        description="Secret key for webhook signature validation (HMAC-SHA256)"
+    )
 
 
 # Global settings instance

@@ -286,6 +286,27 @@ async def get_product_by_external_id(session: AsyncSession, external_id: str) ->
         raise
 
 
+async def get_products_count(session: AsyncSession) -> int:
+    """
+    Get total count of products in database.
+    
+    Args:
+        session: Database session
+        
+    Returns:
+        Total number of products
+    """
+    try:
+        from sqlalchemy import func
+        stmt = select(func.count(Product.id))
+        result = await session.execute(stmt)
+        count = result.scalar()
+        return count or 0
+    except Exception as e:
+        logger.error(f"❌ Failed to get products count: {e}")
+        raise
+
+
 async def get_products(
     session: AsyncSession,
     skip: int = 0,

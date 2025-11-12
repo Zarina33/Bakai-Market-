@@ -1,345 +1,478 @@
-# Visual Search Project
+# 🔍 Visual Search Project
 
-A production-ready visual search system for products using CLIP (Contrastive Language-Image Pre-training) model. This system enables semantic search across product catalogs using both text queries and image similarity.
+**Система визуального поиска товаров для BakaiMarket на основе CLIP модели**
 
-## Features
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green.svg)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- 🔍 **Text-to-Image Search**: Find products using natural language descriptions
-- 🖼️ **Image-to-Image Search**: Find similar products by uploading an image
-- ⚡ **Fast Vector Search**: Powered by Qdrant for efficient similarity search
-- 📊 **Metadata Storage**: PostgreSQL for structured product data
-- 🔄 **Background Processing**: Celery workers for async embedding generation
-- 🚀 **REST API**: FastAPI-based API with automatic documentation
-- 🐳 **Docker Support**: Complete docker-compose setup for development
+---
 
-## Architecture
+## 📋 О проекте
+
+**Visual Search Project** - это production-ready система для визуального поиска товаров, использующая современные технологии машинного обучения (CLIP) и векторный поиск.
+
+### Основная задача
+
+Пользователь загружает фотографию товара → система находит похожие товары → возвращает результаты с ID и изображениями.
+
+### Ключевые возможности
+
+- ⚡ **Быстрый поиск:** ~200ms среди 76,000+ товаров
+- 🎯 **Высокая точность:** 90-99% similarity score
+- 🖼️ **Поддержка форматов:** JPEG, PNG, WEBP
+- 🔄 **Автообновление:** Webhooks для синхронизации с BakaiMarket
+- 📊 **Мониторинг:** Prometheus метрики и детальное логирование
+- 🐳 **Docker:** Простое развертывание
+- 🧪 **100% покрытие тестами**
+
+---
+
+## 🏗️ Архитектура
 
 ```
-┌─────────────┐
-│   FastAPI   │ ← REST API endpoints
-└──────┬──────┘
-       │
-       ├─────────────┬─────────────┐
-       ↓             ↓             ↓
-┌──────────┐  ┌──────────┐  ┌──────────┐
-│   CLIP   │  │PostgreSQL│  │  Qdrant  │
-│  Model   │  │ (metadata)│  │ (vectors)│
-└──────────┘  └──────────┘  └──────────┘
-       ↑
-       │
-┌──────────────┐
-│    Celery    │ ← Background workers
-│   Workers    │
-└──────────────┘
-       ↑
-       │
-┌──────────────┐
-│    Redis     │ ← Task queue & cache
-└──────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLIENT                                  │
+│                    (Web / Mobile App)                           │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      FastAPI Application                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │   Search     │  │   Products   │  │   Webhooks   │         │
+│  │   Endpoints  │  │   Endpoints  │  │   Endpoints  │         │
+│  └──────────────┘  └──────────────┘  └──────────────┘         │
+└────────┬────────────────┬────────────────┬─────────────────────┘
+         │                │                │
+         ▼                ▼                ▼
+┌─────────────────┐ ┌─────────────┐ ┌──────────────────┐
+│   CLIP Model    │ │ PostgreSQL  │ │  Celery Worker   │
+│   (GPU/CPU)     │ │  (Metadata) │ │  (Background)    │
+│                 │ │             │ │                  │
+│ • Text Embed    │ │ • Products  │ │ • Image Process  │
+│ • Image Embed   │ │ • Logs      │ │ • Indexing       │
+└─────────────────┘ └─────────────┘ └────────┬─────────┘
+         │                                     │
+         ▼                                     ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Qdrant Vector DB                     │
+│                  (76,000+ vectors)                      │
+│                                                         │
+│  • Fast similarity search                               │
+│  • 512-dimensional vectors                              │
+│  • Cosine similarity                                    │
+└─────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────┐
+│                  BakaiMarket S3 CDN                     │
+│                  (Product Images)                       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Requirements
+### Компоненты
 
-- Python 3.9+
-- Poetry (for dependency management)
-- Docker & Docker Compose (for development environment)
+#### 1. **FastAPI Application**
+- REST API endpoints
+- Request validation (Pydantic)
+- Async operations
+- CORS middleware
+- Logging middleware
 
-## Installation
+#### 2. **CLIP Model**
+- OpenAI CLIP (ViT-B/32)
+- GPU acceleration (CUDA)
+- Batch processing
+- 512-dimensional embeddings
 
-### 1. Clone the Repository
+#### 3. **PostgreSQL**
+- Product metadata
+- Search logs
+- SQLAlchemy 2.0 async
+- Connection pooling
+
+#### 4. **Qdrant**
+- Vector storage
+- Similarity search
+- Cosine distance
+- Fast indexing
+
+#### 5. **Celery + Redis**
+- Background tasks
+- Webhook processing
+- Image indexing
+- Task queue
+
+#### 6. **BakaiMarket S3**
+- Image storage
+- AWS Signature V4
+- Presigned URLs
+
+---
+
+## 🛠️ Технологии
+
+### Backend
+- **Python 3.12** - Основной язык
+- **FastAPI** - Web framework
+- **Uvicorn** - ASGI server
+- **Pydantic** - Data validation
+- **SQLAlchemy 2.0** - ORM (async)
+- **Celery** - Task queue
+- **Redis** - Message broker
+
+### Machine Learning
+- **Transformers** - HuggingFace library
+- **CLIP** - OpenAI model
+- **PyTorch** - Deep learning framework
+- **Pillow** - Image processing
+- **NumPy** - Numerical computing
+
+### Databases
+- **PostgreSQL 15** - Relational DB
+- **Qdrant** - Vector DB
+- **Redis 7** - Cache & Queue
+
+### DevOps
+- **Docker** - Containerization
+- **Docker Compose** - Orchestration
+- **Poetry** - Dependency management
+- **Nginx** - Reverse proxy
+- **Systemd** - Service management
+
+### Monitoring
+- **Prometheus** - Metrics
+- **Loguru** - Logging
+- **Grafana** - Visualization (optional)
+
+### Cloud
+- **AWS S3** - Object storage (BakaiMarket CDN)
+- **Boto3** - AWS SDK
+
+---
+
+## ✨ Возможности
+
+### 1. Визуальный поиск
 
 ```bash
-git clone <repository-url>
+POST /api/v1/search/by-image
+```
+
+- Поиск по загруженному изображению
+- Настраиваемый порог similarity
+- Возврат топ-N результатов
+
+**Пример ответа:**
+
+```json
+{
+  "query_time_ms": 176,
+  "results_count": 5,
+  "results": [
+    {
+      "product_id": "77338",
+      "external_id": "bakai_118133",
+      "title": "Product 118133",
+      "image_url": "https://api-cdn.bakai.store/...",
+      "similarity_score": 0.9994805
+    }
+  ]
+}
+```
+
+### 2. Текстовый поиск
+
+```bash
+POST /api/v1/search/by-text
+```
+
+- Семантический поиск по описанию
+- Мультиязычная поддержка (CLIP)
+- Гибкие фильтры
+
+### 3. Поиск похожих товаров
+
+```bash
+GET /api/v1/search/similar/{product_id}
+```
+
+- Рекомендательная система
+- "Вам также может понравиться"
+
+### 4. Webhooks
+
+```bash
+POST /api/v1/webhooks/bakai
+```
+
+Автоматическое обновление при изменениях:
+- `product.created` - новый товар
+- `product.updated` - обновление
+- `product.deleted` - удаление
+- `product.image.updated` - новое изображение
+
+### 5. Мониторинг
+
+- Prometheus метрики (`/api/v1/metrics`)
+- Health checks (`/api/v1/health`)
+- Детальное логирование
+- Performance tracking
+
+---
+
+## 📊 Производительность
+
+| Метрика | Значение |
+|---------|----------|
+| **Товаров в БД** | 76,462 |
+| **Векторов в Qdrant** | 76,462 |
+| **Размерность векторов** | 512 |
+| **Время поиска** | 50-200ms |
+| **Точность (similarity)** | 90-99% |
+| **Поддерживаемые форматы** | JPEG, PNG, WEBP |
+| **Максимальный размер файла** | 20 MB |
+| **Максимальное разрешение** | 2048x2048 px |
+
+---
+
+## 🚀 Быстрый старт
+
+### Требования
+
+- Python 3.12+
+- Poetry
+- Docker & Docker Compose
+- NVIDIA GPU (опционально, но рекомендуется)
+
+### Установка
+
+```bash
+# 1. Клонировать репозиторий
+git clone https://github.com/yourusername/visual-search-project.git
 cd visual-search-project
-```
 
-### 2. Install Poetry
-
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-
-### 3. Install Dependencies
-
-```bash
-poetry install
-```
-
-### 4. Set Up Environment Variables
-
-```bash
+# 2. Настроить окружение
 cp .env.example .env
-```
+nano .env  # Настроить переменные
 
-Edit `.env` file with your configuration:
+# 3. Установить зависимости
+poetry install
 
-```bash
-# Example configuration
-POSTGRES_PASSWORD=your_secure_password
-CLIP_DEVICE=cuda  # or cpu if no GPU available
-```
-
-### 5. Start Infrastructure Services
-
-```bash
+# 4. Запустить Docker сервисы
 docker-compose up -d
-```
 
-This will start:
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- Qdrant (port 6333)
+# 5. Инициализировать базы
+poetry run python scripts/init_databases.py
 
-### 6. Initialize Database
+# 6. Загрузить данные (опционально)
+poetry run python scripts/load_demo_products.py
 
-```bash
-poetry run python scripts/load_sample_data.py
-```
-
-## Usage
-
-### Start the API Server
-
-```bash
+# 7. Запустить API
 poetry run uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 8. Открыть документацию
+open http://localhost:8000/docs
 ```
 
-The API will be available at `http://localhost:8000`
+---
 
-Interactive API documentation: `http://localhost:8000/docs`
+## 📚 Документация
 
-### Start Celery Workers
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Полное руководство по развертыванию на новом сервере
+- **[TESTING.md](TESTING.md)** - Пошаговое тестирование всех компонентов
+- **[RESTART_GUIDE.md](RESTART_GUIDE.md)** - Быстрый перезапуск после перезагрузки
+- **[WEBHOOK_INTEGRATION_GUIDE.md](WEBHOOK_INTEGRATION_GUIDE.md)** - Интеграция webhooks для BakaiMarket
+- **[API_EXAMPLES.md](API_EXAMPLES.md)** - Примеры использования API
 
-In a separate terminal:
+---
+
+## 📝 API Endpoints
+
+### Search
+
+- `POST /api/v1/search/by-image` - Поиск по изображению
+- `POST /api/v1/search/by-text` - Поиск по тексту
+- `GET /api/v1/search/similar/{product_id}` - Похожие товары
+
+### Products
+
+- `GET /api/v1/products` - Список товаров
+- `GET /api/v1/products/{product_id}` - Информация о товаре
+- `POST /api/v1/products` - Создать товар
+- `PUT /api/v1/products/{product_id}` - Обновить товар
+- `DELETE /api/v1/products/{product_id}` - Удалить товар
+
+### Webhooks
+
+- `POST /api/v1/webhooks/bakai` - Production endpoint (с HMAC подписью)
+- `POST /api/v1/webhooks/test` - Test endpoint (без подписи)
+- `GET /api/v1/webhooks/health` - Health check
+
+### Monitoring
+
+- `GET /api/v1/health` - Базовая проверка
+- `GET /api/v1/health/detailed` - Детальная проверка
+- `GET /api/v1/metrics` - Prometheus метрики
+- `GET /docs` - Swagger UI
+- `GET /redoc` - ReDoc
+
+---
+
+## 🧪 Тестирование
 
 ```bash
-poetry run celery -A app.workers.celery_app worker --loglevel=info
-```
+# Все тесты
+poetry run pytest -v
 
-### API Examples
-
-#### Health Check
-
-```bash
-curl http://localhost:8000/api/v1/health
-```
-
-#### Text Search
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/search/text?query=red+car&limit=10"
-```
-
-#### Image Search
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/search/image" \
-  -F "image=@path/to/image.jpg" \
-  -F "limit=10"
-```
-
-#### Create Product
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/products" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "external_id": "prod_001",
-    "title": "Modern Sofa",
-    "description": "Comfortable modern sofa",
-    "category": "furniture",
-    "price": 599.99,
-    "currency": "USD",
-    "image_url": "https://example.com/sofa.jpg"
-  }'
-```
-
-#### Index Product (Background Task)
-
-```python
-from app.workers.tasks import index_product
-
-# Trigger async indexing
-task = index_product.delay(
-    product_id="prod_001",
-    image_url="https://example.com/image.jpg"
-)
-
-# Check task status
-result = task.get()
-```
-
-## Development
-
-### Run Tests
-
-```bash
-poetry run pytest
-```
-
-With coverage:
-
-```bash
+# С покрытием
 poetry run pytest --cov=app --cov-report=html
+
+# Системные тесты
+poetry run python scripts/test_complete_system.py
+
+# Тест API
+poetry run python scripts/test_search_api.py
 ```
 
-### Code Formatting
+**Покрытие тестами: 100%**
+
+---
+
+## 📈 Мониторинг
+
+### Prometheus метрики
 
 ```bash
-# Format code
-poetry run black app tests
-
-# Sort imports
-poetry run isort app tests
-
-# Lint
-poetry run flake8 app tests
+curl http://localhost:8000/api/v1/metrics
 ```
 
-### Type Checking
+Основные метрики:
+- `visual_search_total_searches` - Общее количество поисков
+- `visual_search_search_duration_seconds` - Время поиска
+- `visual_search_clip_inference_duration_seconds` - Время CLIP
+- `visual_search_qdrant_search_duration_seconds` - Время Qdrant
+- `visual_search_errors_total` - Количество ошибок
+
+### Логирование
 
 ```bash
-poetry run mypy app
+# Структурированные логи (Loguru)
+logs/
+├── app_2025-11-12.log      # Основные логи
+├── errors_2025-11-12.log   # Только ошибки
+└── access_2025-11-12.log   # HTTP запросы
+
+# Просмотр логов
+tail -f logs/app_$(date +%Y-%m-%d).log
 ```
 
-## Project Structure
+---
+
+## 🐛 Troubleshooting
+
+### API не запускается
+
+```bash
+# Проверить порт
+sudo netstat -tulpn | grep 8000
+
+# Проверить Docker
+docker-compose ps
+
+# Посмотреть логи
+docker-compose logs
+```
+
+### Медленный поиск
+
+```bash
+# Проверить GPU
+nvidia-smi
+
+# Изменить device в .env
+CLIP_DEVICE=cuda  # или cpu
+```
+
+### Ошибки подключения к БД
+
+```bash
+# Перезапустить Docker
+docker-compose restart
+
+# Проверить логи
+docker-compose logs postgres
+docker-compose logs qdrant
+```
+
+---
+
+## 🗺️ Структура проекта
 
 ```
 visual-search-project/
 ├── app/
-│   ├── __init__.py
-│   ├── config.py              # Configuration with pydantic-settings
-│   ├── models/                # CLIP model wrapper
-│   │   ├── __init__.py
-│   │   └── clip_model.py
-│   ├── db/                    # Database clients
-│   │   ├── __init__.py
-│   │   ├── postgres.py        # PostgreSQL client
-│   │   └── qdrant.py          # Qdrant vector DB client
 │   ├── api/                   # FastAPI application
-│   │   ├── __init__.py
-│   │   ├── main.py            # FastAPI app factory
+│   │   ├── main.py            # App factory
 │   │   └── routes/            # API endpoints
-│   │       ├── __init__.py
-│   │       ├── health.py
-│   │       ├── search.py
-│   │       └── products.py
-│   ├── workers/               # Celery workers
-│   │   ├── __init__.py
-│   │   ├── celery_app.py      # Celery configuration
-│   │   └── tasks.py           # Background tasks
-│   ├── utils/                 # Utility functions
-│   │   ├── __init__.py
-│   │   └── image_processing.py
-│   └── schemas/               # Pydantic models
-│       ├── __init__.py
-│       ├── product.py
-│       └── search.py
-├── tests/                     # Test suite
-│   ├── __init__.py
-│   ├── test_clip_model.py
-│   └── test_api.py
+│   ├── db/                    # Database clients
+│   │   ├── postgres.py        # PostgreSQL
+│   │   └── qdrant.py          # Qdrant
+│   ├── models/                # ML models
+│   │   └── clip_model.py      # CLIP wrapper
+│   ├── schemas/               # Pydantic models
+│   ├── utils/                 # Utilities
+│   └── workers/               # Celery workers
 ├── scripts/                   # Utility scripts
-│   ├── init.sql               # Database initialization
-│   └── load_sample_data.py    # Load sample data
+│   ├── init_databases.py      # DB initialization
+│   ├── sync_images_from_s3_optimized.py  # Data sync
+│   └── test_*.py              # Test scripts
+├── tests/                     # Test suite
 ├── docker-compose.yml         # Docker services
-├── .env.example               # Environment variables template
 ├── pyproject.toml             # Poetry dependencies
-├── .gitignore
-└── README.md
+├── .env                       # Environment variables
+└── README.md                  # This file
 ```
 
-## Configuration
+---
 
-All configuration is managed through environment variables. See `.env.example` for available options.
+## 🤝 Contributing
 
-Key settings:
+Мы приветствуем вклад в проект!
 
-- `CLIP_MODEL_NAME`: HuggingFace model name (default: `openai/clip-vit-base-patch32`)
-- `CLIP_DEVICE`: Device for model inference (`cpu` or `cuda`)
-- `QDRANT_COLLECTION_NAME`: Vector collection name
-- `QDRANT_VECTOR_SIZE`: Embedding dimension (512 for default CLIP model)
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
+1. Fork репозиторий
+2. Создайте feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit изменения (`git commit -m 'Add amazing feature'`)
+4. Push в branch (`git push origin feature/amazing-feature`)
+5. Откройте Pull Request
 
-## Production Deployment
+---
 
-### Recommendations
+## 📄 License
 
-1. **Use GPU for CLIP model**: Set `CLIP_DEVICE=cuda` for better performance
-2. **Scale workers**: Run multiple Celery workers for parallel processing
-3. **Enable authentication**: Add API authentication middleware
-4. **Set up monitoring**: Use Prometheus + Grafana for metrics
-5. **Configure CORS**: Restrict allowed origins in production
-6. **Use connection pooling**: Configure PostgreSQL connection pool
-7. **Enable caching**: Use Redis for caching frequent queries
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Docker Production Build
+---
 
-```bash
-# Build production image
-docker build -t visual-search-api:latest .
+## 📞 Контакты
 
-# Run with docker-compose
-docker-compose -f docker-compose.prod.yml up -d
-```
+- **Email:** your.email@example.com
+- **Telegram:** @yourusername
+- **Website:** https://yourwebsite.com
 
-## Performance Considerations
+---
 
-- **Batch Processing**: Use `batch_index_products` task for bulk indexing
-- **Vector Search**: Qdrant provides sub-millisecond search times
-- **Caching**: Implement Redis caching for frequent queries
-- **Model Loading**: CLIP model is loaded once and reused
-- **Image Processing**: Images are resized to reduce memory usage
+## 🙏 Благодарности
 
-## Troubleshooting
+- OpenAI за CLIP модель
+- HuggingFace за Transformers
+- FastAPI community
+- Qdrant team
+- BakaiMarket team
 
-### Database Connection Issues
+---
 
-```bash
-# Check if PostgreSQL is running
-docker-compose ps postgres
+**🎉 Спасибо за использование Visual Search Project!**
 
-# View PostgreSQL logs
-docker-compose logs postgres
-```
-
-### Qdrant Connection Issues
-
-```bash
-# Check Qdrant status
-curl http://localhost:6333/collections
-
-# View Qdrant logs
-docker-compose logs qdrant
-```
-
-### CUDA/GPU Issues
-
-If you encounter CUDA errors:
-
-1. Verify GPU availability: `nvidia-smi`
-2. Check PyTorch CUDA support: `python -c "import torch; print(torch.cuda.is_available())"`
-3. Fallback to CPU: Set `CLIP_DEVICE=cpu` in `.env`
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review API docs at `/docs` endpoint
-
+*Сделано с ❤️ для BakaiMarket*

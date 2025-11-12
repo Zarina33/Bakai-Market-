@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
         
         logger.info("=" * 60)
         logger.success("✅ Startup complete! API is ready.")
-        logger.info(f"📊 Metrics available at: http://{settings.host}:{settings.port}/api/v1/metrics")
+        logger.info(f"📊 Metrics available at: http://{settings.api_host}:{settings.api_port}/api/v1/metrics")
         logger.info("=" * 60)
         
     except Exception as e:
@@ -113,6 +113,10 @@ def create_app() -> FastAPI:
     app.include_router(search.router, tags=["search"])
     app.include_router(products.router, prefix="/api/v1", tags=["products"])
     app.include_router(metrics.router, prefix="/api/v1", tags=["monitoring"])
+    
+    # Import and include webhooks router
+    from app.api.routes import webhooks
+    app.include_router(webhooks.router, tags=["webhooks"])
     
     return app
 
